@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  flask-app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_DATABASE: pesto
+      MYSQL_USER: root
+      MYSQL_PASSWORD: sayan123
+      MYSQL_PORT: 3306
+    depends_on:
+      - mysql
+      - redis
+
+  mysql:
+    image: mysql:5.7
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: sayan123
+      MYSQL_DATABASE: pesto
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
