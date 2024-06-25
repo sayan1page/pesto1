@@ -42,6 +42,8 @@ minikube start
 docker build -t flask-app:latest .
 kubectl apply -f deployment.yaml
 
+#you can seperately deploy flask app, mysql and redis those seperate config files are there
+
 #to make it scalable
 minikube service flask-app-service
 kubectl scale deployment flask-app-deployment --replicas=<no_of_replica_you want>
