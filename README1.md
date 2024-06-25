@@ -1,4 +1,6 @@
 #Steps to Run:
+#to doownload the code from git
+gh repo clone sayan1page/pesto1
 #In windows:
 #From Ubuntu Shell:
 sudo service redis-server start
@@ -49,7 +51,9 @@ kubectl get pods
 kubectl describe pod <pod-name>
 
 
-
+# we can make it scalable in another way there is a big query implementaion of Resource.py is given. Use that in app.py then
+#from a google compute engine download the backend from git and run
+gcloud app deploy --prject <prject id>  --version <version no> 
 
 
 
