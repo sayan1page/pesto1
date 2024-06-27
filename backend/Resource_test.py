@@ -3,10 +3,11 @@ import string
 import random
 import json
 import redis
-
+from passlib.hash import bcrypt
+import os
 
 class Database:
-    def __init__(self, host='localhost', user='root', password='sayan123',port=3306, database='pesto'):
+    def __init__(self, host='localhost', user='root', password='sayan123', port=3306, database='pesto'):
         self.conn = mysql.connector.connect(
             host=host,
             user=user,
@@ -18,7 +19,6 @@ class Database:
         self.create_tables()
 
     def create_tables(self):
-        # Create Item table
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS User (
                                 user_id INT AUTO_INCREMENT PRIMARY KEY,
                                 username VARCHAR(50) NOT NULL,
@@ -32,7 +32,6 @@ class Database:
                                price DECIMAL(10, 2) NOT NULL,
                                item_description TEXT)
                                ''')
-        # Create Order table
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS `Order` (
                                order_id INT AUTO_INCREMENT PRIMARY KEY,
                                user_id INT NOT NULL,
@@ -40,7 +39,6 @@ class Database:
                                item_amount INT NOT NULL,
                                FOREIGN KEY (user_id) REFERENCES User(user_id),
                                FOREIGN KEY (item_id) REFERENCES Item(item_id))''')
-        # Create keys table
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS `keys` (
                                temp_key VARCHAR(255) NOT NULL,
                                user_id INT NOT NULL,
@@ -48,32 +46,56 @@ class Database:
                                PRIMARY KEY (temp_key),
                                FOREIGN KEY (user_id) REFERENCES User(user_id))''')
         self.conn.commit()
-      
 
-    
+    def get_lock(self, lock_name):
+        self.cursor.execute(f"SELECT GET_LOCK('{lock_name}', 10)")
+        result = self.cursor.fetchone()
+        return result[0] == 1
+
+    def release_lock(self, lock_name):
+        self.cursor.execute(f"SELECT RELEASE_LOCK('{lock_name}')")
+        result = self.cursor.fetchone()
+        return result[0] == 1
 
 class User:
     def __init__(self, db):
         self.db = db
 
     def create_user(self, username, password, email, role='user'):
-        self.db.cursor.execute('''INSERT INTO User (username, password, email, role) VALUES (%s, %s, %s, %s)''', (username, password, email, role))
-        self.db.conn.commit()
+        #hashed_password = bcrypt.hash(password)
+        lock_name = f"user_create"
+        if self.db.get_lock(lock_name):
+            try:
+                self.db.cursor.execute('''INSERT INTO User (username, password, email, role) VALUES (%s, %s, %s, %s)''', (username, password, email, role))
+                self.db.conn.commit()
+            finally:
+                self.db.release_lock(lock_name)
 
     def update_user(self, user_id, username=None, password=None, email=None, role=None):
-        if username:
-            self.db.cursor.execute('''UPDATE User SET username = %s WHERE user_id = %s''', (username, user_id))
-        if password:
-            self.db.cursor.execute('''UPDATE User SET password = %s WHERE user_id = %s''', (password, user_id))
-        if email:
-            self.db.cursor.execute('''UPDATE User SET email = %s WHERE user_id = %s''', (email, user_id))
-        if role:
-            self.db.cursor.execute('''UPDATE User SET role = %s WHERE user_id = %s''', (role, user_id))
-        self.db.conn.commit()
+        lock_name = f"user_update"
+        if self.db.get_lock(lock_name):
+            try:
+                if username:
+                    self.db.cursor.execute('''UPDATE User SET username = %s WHERE user_id = %s''', (username, user_id))
+                if password:
+                    hashed_password = bcrypt.hash(password)
+                    self.db.cursor.execute('''UPDATE User SET password = %s WHERE user_id = %s''', (hashed_password, user_id))
+                if email:
+                    self.db.cursor.execute('''UPDATE User SET email = %s WHERE user_id = %s''', (email, user_id))
+                if role:
+                    self.db.cursor.execute('''UPDATE User SET role = %s WHERE user_id = %s''', (role, user_id))
+                self.db.conn.commit()
+            finally:
+                self.db.release_lock(lock_name)
 
     def delete_user(self, user_id):
-        self.db.cursor.execute('''DELETE FROM User WHERE user_id = %s''', (user_id,))
-        self.db.conn.commit()
+        lock_name = f"user_delete"
+        if self.db.get_lock(lock_name):
+            try:
+                self.db.cursor.execute('''DELETE FROM User WHERE user_id = %s''', (user_id,))
+                self.db.conn.commit()
+            finally:
+                self.db.release_lock(lock_name)
 
     def list_users(self):
         self.db.cursor.execute('''SELECT * FROM User''')
@@ -84,21 +106,36 @@ class Item:
         self.db = db
 
     def create_item(self, item_name, price, item_description):
-        self.db.cursor.execute('''INSERT INTO Item (item_name, price, item_description) VALUES (%s, %s, %s)''', (item_name, price, item_description))
-        self.db.conn.commit()
+        lock_name = f"item_create"
+        if self.db.get_lock(lock_name):
+            try:
+                self.db.cursor.execute('''INSERT INTO Item (item_name, price, item_description) VALUES (%s, %s, %s)''', (item_name, price, item_description))
+                self.db.conn.commit()
+            finally:
+                self.db.release_lock(lock_name)
 
     def update_item(self, item_id, item_name=None, price=None, item_description=None):
-        if item_name:
-            self.db.cursor.execute('''UPDATE Item SET item_name = %s WHERE item_id = %s''', (item_name, item_id))
-        if price:
-            self.db.cursor.execute('''UPDATE Item SET price = %s WHERE item_id = %s''', (price, item_id))
-        if item_description:
-            self.db.cursor.execute('''UPDATE Item SET item_description = %s WHERE item_id = %s''', (item_description, item_id))
-        self.db.conn.commit()
+        lock_name = f"item_update"
+        if self.db.get_lock(lock_name):
+            try:
+                if item_name:
+                    self.db.cursor.execute('''UPDATE Item SET item_name = %s WHERE item_id = %s''', (item_name, item_id))
+                if price:
+                    self.db.cursor.execute('''UPDATE Item SET price = %s WHERE item_id = %s''', (price, item_id))
+                if item_description:
+                    self.db.cursor.execute('''UPDATE Item SET item_description = %s WHERE item_id = %s''', (item_description, item_id))
+                self.db.conn.commit()
+            finally:
+                self.db.release_lock(lock_name)
 
     def delete_item(self, item_id):
-        self.db.cursor.execute('''DELETE FROM Item WHERE item_id = %s''', (item_id,))
-        self.db.conn.commit()
+        lock_name = f"item_delete"
+        if self.db.get_lock(lock_name):
+            try:
+                self.db.cursor.execute('''DELETE FROM Item WHERE item_id = %s''', (item_id,))
+                self.db.conn.commit()
+            finally:
+                self.db.release_lock(lock_name)
 
     def list_items(self):
         self.db.cursor.execute('''SELECT * FROM Item''')
@@ -110,8 +147,13 @@ class Order:
         self.redis_client = redis.StrictRedis(host='localhost', port=6379, decode_responses=True)
 
     def create_order(self, user_id, item_id, item_amount):
-        self.db.cursor.execute('''INSERT INTO `Order` (user_id, item_id, item_amount) VALUES (%s, %s, %s)''', (user_id, item_id, item_amount))
-        self.db.conn.commit()
+        lock_name = f"order_create"
+        if self.db.get_lock(lock_name):
+            try:
+                self.db.cursor.execute('''INSERT INTO `Order` (user_id, item_id, item_amount) VALUES (%s, %s, %s)''', (user_id, item_id, item_amount))
+                self.db.conn.commit()
+            finally:
+                self.db.release_lock(lock_name)
 
     def create_order_asynchronous(self, user_id, item_id, item_amount):
         order_data = {
@@ -122,17 +164,27 @@ class Order:
         self.redis_client.rpush('order_queue', json.dumps(order_data))
 
     def update_order(self, order_id, user_id=None, item_id=None, item_amount=None):
-        if user_id:
-            self.db.cursor.execute('''UPDATE `Order` SET user_id = %s WHERE order_id = %s''', (user_id, order_id))
-        if item_id:
-            self.db.cursor.execute('''UPDATE `Order` SET item_id = %s WHERE order_id = %s''', (item_id, order_id))
-        if item_amount:
-            self.db.cursor.execute('''UPDATE `Order` SET item_amount = %s WHERE order_id = %s''', (item_amount, order_id))
-        self.db.conn.commit()
+        lock_name = f"order_update"
+        if self.db.get_lock(lock_name):
+            try:
+                if user_id:
+                    self.db.cursor.execute('''UPDATE `Order` SET user_id = %s WHERE order_id = %s''', (user_id, order_id))
+                if item_id:
+                    self.db.cursor.execute('''UPDATE `Order` SET item_id = %s WHERE order_id = %s''', (item_id, order_id))
+                if item_amount:
+                    self.db.cursor.execute('''UPDATE `Order` SET item_amount = %s WHERE order_id = %s''', (item_amount, order_id))
+                self.db.conn.commit()
+            finally:
+                self.db.release_lock(lock_name)
 
     def delete_order(self, order_id):
-        self.db.cursor.execute('''DELETE FROM `Order` WHERE order_id = %s''', (order_id,))
-        self.db.conn.commit()
+        lock_name = f"order_delete"
+        if self.db.get_lock(lock_name):
+            try:
+                self.db.cursor.execute('''DELETE FROM `Order` WHERE order_id = %s''', (order_id,))
+                self.db.conn.commit()
+            finally:
+                self.db.release_lock(lock_name)
 
     def list_orders(self, user_id=None):
         if user_id:
@@ -140,7 +192,7 @@ class Order:
         else:
             self.db.cursor.execute('''SELECT * FROM `Order`''')
         return self.db.cursor.fetchall()
-        
+
 class ManageKey:
     def __init__(self, db):
         self.db = db
@@ -151,18 +203,33 @@ class ManageKey:
         return random_string
 
     def insert_key(self, temp_key, user_id):
-        self.db.cursor.execute('''INSERT INTO `keys` (temp_key, user_id) VALUES (%s, %s)''', (temp_key, user_id))
-        self.db.conn.commit()
+        lock_name = f"key_insert"
+        if self.db.get_lock(lock_name):
+            try:
+                self.db.cursor.execute('''INSERT INTO `keys` (temp_key, user_id) VALUES (%s, %s)''', (temp_key, user_id))
+                self.db.conn.commit()
+            finally:
+                self.db.release_lock(lock_name)
 
     def has_key(self, key):
-        self.db.cursor.execute('''SELECT EXISTS(SELECT 1 FROM `keys` WHERE `temp_key` = %s)''', (key,))
-        result = self.db.cursor.fetchone()
-        return result[0] == 1
+        lock_name = f"key_check"
+        if self.db.get_lock(lock_name):
+            try:
+                self.db.cursor.execute('''SELECT EXISTS(SELECT 1 FROM `keys` WHERE `temp_key` = %s)''', (key,))
+                result = self.db.cursor.fetchone()
+                return result[0] == 1
+            finally:
+                self.db.release_lock(lock_name)
 
     def whose_key(self, key):
-        self.db.cursor.execute('''SELECT user_id FROM `keys` WHERE `temp_key` = %s''', (key,))
-        result = self.db.cursor.fetchone()
-        return result[0] if result else None
+        lock_name = f"key_user"
+        if self.db.get_lock(lock_name):
+            try:
+                self.db.cursor.execute('''SELECT user_id FROM `keys` WHERE `temp_key` = %s''', (key,))
+                result = self.db.cursor.fetchone()
+                return result[0] if result else None
+            finally:
+                self.db.release_lock(lock_name)
 
 # Usage example
 db = Database()
@@ -194,4 +261,3 @@ user_id_for_key = manager.whose_key(random_key)
 print(f"User ID for key: {user_id_for_key}")
 
 order.create_order_asynchronous(1, 1, 5)
-
