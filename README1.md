@@ -24,6 +24,7 @@ python Subscriber.py
 #From another directory
 python Resource_test.py
 
+#to make temp key deleted in 24 hours use the event query in pesto.sql
 #To test the docker
 #start docker engine
 #From Ubuntu shell
