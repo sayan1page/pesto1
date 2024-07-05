@@ -9,7 +9,7 @@ import os
 import secrets 
 
 class Database:
-    def __init__(self, host='localhost', user='root', password='sayan123', port=3306, database='pesto'):
+    def __init__(self, host='mysql', user='root', password='sayan123', port=3306, database='pesto'):
         self.conn = mysql.connector.connect(
             host=host,
             user=user,
@@ -147,7 +147,7 @@ class Item:
 class Order:
     def __init__(self, db):
         self.db = db
-        self.redis_client = redis.StrictRedis(host='localhost', port=6379, decode_responses=True)
+        self.redis_client = redis.StrictRedis(host='redis', port=6379, decode_responses=True)
 
     def create_order(self, user_id, item_id, item_amount):
         lock_name = f"order_create" + secrets.token_hex(nbytes=16)

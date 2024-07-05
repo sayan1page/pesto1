@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from Resource import Database, User, Item, Order, ManageKey
+from Resource_test1 import Database, User, Item, Order, ManageKey
 import redis
 import json
+#import bcrypt
+from passlib.hash import bcrypt
 
 app = Flask(__name__)
 cors = CORS(app, resources={
@@ -74,7 +76,8 @@ def authenticate_user():
     try:
         data = request.get_json()
         username = data.get('username')
-        password = data.get('password')
+        fixed_salt = 'abcdefghijklmonopqrstu'
+        password = bcrypt.using(salt=fixed_salt).hash(data.get('password'))
         user_data = user.list_users()
         for u in user_data:
             if u[1] == username and u[2] == password:

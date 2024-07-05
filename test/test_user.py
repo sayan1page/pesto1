@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import Mock
 from backend.Resource_test import User
+#import bcrypt
+from passlib.hash import bcrypt
 
 class TestUser(unittest.TestCase):
     def setUp(self):
@@ -9,9 +11,10 @@ class TestUser(unittest.TestCase):
 
     def test_create_user(self):
         self.user.create_user("john_doe", "password123", "john@example.com", "admin")
+        fixed_salt = 'abcdefghijklmonopqrstu'
         self.db.cursor.execute.assert_called_once_with(
             '''INSERT INTO User (username, password, email, role) VALUES (%s, %s, %s, %s)''',
-            ("john_doe", "password123", "john@example.com", "admin")
+            ("john_doe",bcrypt.using(salt=fixed_salt).hash("password123"), "john@example.com", "admin")
         )
         self.db.conn.commit.assert_called_once()
 

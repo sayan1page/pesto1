@@ -37,10 +37,13 @@ docker-compose up --build --force-recreate
 
 
 #To deploy it in kuberante
-minikube start
+minikube start  --v=7 --alsologtostderr
 & minikube -p minikube docker-env --shell powershell | Invoke-Expression
 docker build -t flask-app:latest .
 kubectl apply -f deployment.yaml
+kubectl port-forward <flask-app-pod-name> 5000:5000
+
+#run the frontend again
 
 #you can seperately deploy flask app, mysql and redis those seperate config files are there
 
